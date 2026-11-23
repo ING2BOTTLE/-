@@ -1,0 +1,790 @@
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10131c">
+<title>MY TIER · Community</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#10131c;--panel:#191f2d;--panel2:#242d40;--line:#35415a;--txt:#f4f6fc;--muted:#9ca9c1}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 50% -20%,#293756,transparent 55%),var(--bg);color:var(--txt);font:15px/1.5 system-ui,-apple-system,"Noto Sans KR",sans-serif}
+header{max-width:1120px;margin:auto;padding:24px 18px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header h1{margin:0;font-size:25px;letter-spacing:.08em;font-weight:1000}
+header small{color:#aebaff;letter-spacing:.18em;font-weight:800}
+main{max-width:1120px;margin:auto;padding:8px 16px 60px}
+.nav,.actions{display:flex;gap:8px;flex-wrap:wrap}
+.nav{border-bottom:1px solid var(--line);padding:0 0 12px;margin-bottom:18px}
+button,.btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px 14px;font-weight:750;cursor:pointer;font-size:13px}
+button.primary,.btn.primary{background:#6578f5;border-color:#6578f5;color:white}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:hover{filter:brightness(1.13)}
+input,textarea,select{width:100%;background:#101622;border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:10px;font:inherit}
+input[type=file]{padding:8px}
+label{display:block;color:var(--muted);font-size:12px;margin:9px 0 5px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:16px;margin:12px 0}
+.hero{padding:22px;background:linear-gradient(130deg,#202d4b,#171d2c);border:1px solid #3a496c;border-radius:18px}
+.hero h2{font-size:clamp(26px,5vw,42px);line-height:1.12;margin:5px 0 8px}
+.muted{color:var(--muted)}
+.tiny{font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.card{background:#20283a;border:1px solid var(--line);border-radius:13px;padding:14px}
+.card h3{margin:2px 0 5px}
+.hidden{display:none!important}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.row>*{flex:1}
+.row button{flex:0 0 auto}
+.tier{display:grid;grid-template-columns:70px 1fr;min-height:96px;margin:8px 0;border:1px solid #ffffff17;border-radius:12px;overflow:hidden;background:#171d29;cursor:pointer}
+.tier-label{display:grid;place-items:center;color:#161923;font-size:25px;font-weight:1000}
+.tiles{display:flex;flex-wrap:wrap;gap:7px;padding:8px;min-height:96px}
+.tile{width:78px;background:#293246;border-radius:8px;overflow:hidden;cursor:pointer;border:1px solid #ffffff25;touch-action:manipulation}
+.tile img{width:100%;aspect-ratio:1;object-fit:cover;display:block;pointer-events:none}
+.tile span{display:block;text-align:center;font-size:10px;padding:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.tile.selected{outline:3px solid #aebaff}
+.pool{background:#171d29;border:1px dashed #46516a;border-radius:12px;padding:10px;min-height:80px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:#20283a;padding:12px;border-radius:10px}
+.stat b{display:block;font-size:23px}
+.itemrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #ffffff12}
+.itemrow img{width:44px;height:44px;object-fit:cover;border-radius:7px}
+.itemrow .grow{flex:1}
+.notice{padding:10px 12px;border-radius:9px;background:#263451;color:#cbd5ff;font-size:12px;margin:10px 0}
+.notice.warning{background:#49351f;border:1px solid #8d6735;color:#ffe2ad;font-size:13px}
+footer{text-align:center;color:#78849b;font-size:11px;margin-top:28px}
+@media(max-width:520px){
+header{padding:18px 12px}
+main{padding:5px 9px 40px}
+.tier{grid-template-columns:52px 1fr;min-height:82px}
+.tier-label{font-size:21px}
+.tiles{min-height:82px;gap:5px;padding:6px}
+.tile{width:calc((100% - 15px)/4);max-width:78px}
+.stats{grid-template-columns:1fr 1fr}
+.nav button{flex:1}
+}
+</style>
+</head>
+<body>
+<header>
+<div><small>COMMUNITY RANKING SYSTEM</small><h1>MY TIER.</h1></div>
+<div class="row" style="flex:0 1 310px">
+<span id="who" class="muted tiny">게스트</span>
+<button id="profileBtn">닉네임 설정</button>
+</div>
+</header>
+
+<main>
+<nav class="nav">
+<button data-view="home" class="primary">홈</button>
+<button data-view="create">만들기</button>
+<button data-view="rankings">랭킹</button>
+<button data-view="mine">내 목록</button>
+<button id="settingsBtn">연결 설정</button>
+</nav>
+
+<div id="setupNotice" class="notice">
+데모 모드로 실행 중이야. 여러 사람의 실시간 공유와 집계를 사용하려면 Supabase 프로젝트를 연결해 줘.
+</div>
+
+<div class="notice warning">
+<b>⚠️ 계정 데이터 보관 안내</b><br>
+현재 서비스는 익명 계정으로 로그인해. 브라우저 데이터·쿠키를 삭제하거나 다른 기기/브라우저로 바꾸면 기존 익명 계정에 다시 로그인할 수 없어. 데모 모드 데이터는 이 브라우저에 저장돼.
+</div>
+
+<section id="home" class="view">
+<div class="hero">
+<small>CREATE · SHARE · RANK · COMPARE</small>
+<h2>당신의 취향을<br>티어로 표현하세요.</h2>
+<p class="muted">공통 주제로 함께 평가하거나, 나만의 티어리스트를 만들어 공유해 봐.</p>
+<div class="actions">
+<button class="primary" data-go="create">티어리스트 만들기</button>
+<button data-go="join">초대 코드로 참여</button>
+</div>
+</div>
+<div class="panel">
+<h3>링크로 참여하기</h3>
+<div class="row">
+<input id="joinCode" placeholder="공유 코드 또는 링크 붙여넣기">
+<button id="joinBtn" class="primary">참여</button>
+</div>
+</div>
+<div class="panel">
+<h3>최근 공개 티어리스트</h3>
+<div id="recent" class="grid"></div>
+</div>
+</section>
+
+<section id="create" class="view hidden">
+<div class="panel">
+<h2>새 티어리스트</h2>
+<label>제목</label>
+<input id="newTitle" placeholder="예: 최애 게임 캐릭터 월드컵">
+<label>설명</label>
+<textarea id="newDesc" rows="2" placeholder="어떤 기준으로 평가하나요?"></textarea>
+<label>제작 방식</label>
+<select id="newMode">
+<option value="common">공통 주제형 · 모두 같은 항목 평가</option>
+<option value="free">자유 제작형 · 각자 항목 구성</option>
+</select>
+<label>공개 설정</label>
+<select id="newPublic">
+<option value="true">링크가 있으면 누구나 참여</option>
+<option value="false">비공개 · 제작자 중심</option>
+</select>
+<label>항목 이미지 여러 장 선택</label>
+<input id="newFiles" type="file" accept="image/*" multiple>
+<p class="tiny muted">공통 주제형은 제작자가 항목을 미리 등록해. 자유 제작형은 참여자가 직접 항목을 추가할 수 있어.</p>
+<button id="createBtn" class="primary">티어리스트 생성</button>
+</div>
+</section>
+
+<section id="join" class="view hidden">
+<div class="panel">
+<h2>티어리스트 참여</h2>
+<p class="muted">초대 코드나 링크를 입력하면 해당 티어리스트로 이동해.</p>
+<div class="row">
+<input id="joinCode2" placeholder="초대 코드">
+<button id="joinBtn2" class="primary">열기</button>
+</div>
+</div>
+</section>
+
+<section id="detail" class="view hidden">
+<div class="panel">
+<div class="row">
+<div>
+<small id="detailMode" class="muted"></small>
+<h2 id="detailTitle">티어리스트</h2>
+<p id="detailDesc" class="muted tiny"></p>
+</div>
+<button id="copyLink">링크 복사</button>
+</div>
+<div id="ownerTools" class="actions"></div>
+<div id="tierBoard"></div>
+<div class="panel">
+<h3>미분류 항목</h3>
+<div id="unranked" class="pool tiles"></div>
+</div>
+<div class="actions">
+<label class="btn" for="addImages">＋ 이미지 추가</label>
+<input id="addImages" type="file" accept="image/*" multiple class="hidden">
+<button id="submitBtn" class="primary">내 결과 제출</button>
+<button id="viewResults">전체 결과 보기</button>
+</div>
+<p id="detailStatus" class="tiny muted"></p>
+</div>
+</section>
+
+<section id="rankings" class="view hidden">
+<div class="panel">
+<h2>전체 랭킹</h2>
+<p class="muted tiny">공개된 티어리스트의 제출 결과를 모아 보여줘.</p>
+<div id="rankingList"></div>
+</div>
+</section>
+
+<section id="mine" class="view hidden">
+<div class="panel">
+<h2>내 티어리스트</h2>
+<div id="mineList"></div>
+</div>
+</section>
+
+<section id="results" class="view hidden">
+<div class="panel">
+<div class="row">
+<div><small class="muted">COMMUNITY RESULT</small><h2>전체 참여자 집계</h2></div>
+<button id="backDetail">돌아가기</button>
+</div>
+<div id="resultStats" class="stats"></div>
+<div id="resultList"></div>
+</div>
+</section>
+</main>
+
+<footer>MY TIER · Community tier ranking · 개인 정보 대신 닉네임을 사용해.</footer>
+
+<script>
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+
+let sb=null;
+let user=null;
+let nickname=localStorage.getItem('mytier_nick')||'';
+let current=null;
+let items=[];
+let tiers=[['S','#ef777d'],['A','#efa85d'],['B','#e8d36b'],['C','#83bd91'],['D','#78a9dc'],['F','#aa91d8']];
+let selected=null;
+let localLists=JSON.parse(localStorage.getItem('mytier_demo')||'[]');
+
+function msg(s){$('#detailStatus').textContent=s}
+function escapeHtml(s){
+ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function show(v){
+ $$('.view').forEach(x=>x.classList.add('hidden'));
+ $('#'+v).classList.remove('hidden');
+ $$('.nav button[data-view]').forEach(b=>b.classList.toggle('primary',b.dataset.view===v));
+}
+function updateWho(){ $('#who').textContent=nickname||'닉네임 미설정'; }
+function getCode(){return new URL(location.href).searchParams.get('tier')}
+
+async function setup(){
+ const url=localStorage.getItem('mytier_url');
+ const key=localStorage.getItem('mytier_key');
+
+ if(url&&key){
+  try{
+   if(!window.supabase) throw new Error('Supabase 라이브러리를 불러오지 못했어.');
+
+   const client=window.supabase.createClient(url,key);
+   const {data:sessionData,error:sessionError}=await client.auth.getSession();
+   if(sessionError) throw sessionError;
+
+   user=sessionData.session?.user||null;
+
+   if(!user){
+    const {data,error}=await client.auth.signInAnonymously();
+    if(error) throw error;
+    user=data.user||data.session?.user||null;
+   }
+
+   if(!user) throw new Error('로그인 사용자 정보를 가져오지 못했어.');
+
+   sb=client;
+   $('#setupNotice').classList.add('hidden');
+
+  }catch(e){
+   console.error('Supabase 로그인 오류:',e);
+   sb=null;
+   user=null;
+   $('#setupNotice').classList.remove('hidden');
+   $('#setupNotice').textContent='Supabase 로그인 실패. 데모 모드로 실행 중이야. 오류: '+e.message;
+  }
+ }
+
+ updateWho();
+
+ if(sb&&user){
+  const {data,error}=await sb.from('profiles').select('nickname').eq('id',user.id).maybeSingle();
+  if(!error&&data?.nickname){
+   nickname=data.nickname;
+   localStorage.setItem('mytier_nick',nickname);
+   updateWho();
+  }
+ }
+
+ if(getCode()) await openList(getCode());
+ else await loadHome();
+}
+
+async function profile(){
+ const n=prompt('사용할 닉네임을 입력해 줘.',nickname);
+ if(n===null)return;
+ if(!n.trim()){alert('닉네임을 입력해 줘.');return;}
+
+ nickname=n.trim().slice(0,24);
+ localStorage.setItem('mytier_nick',nickname);
+ updateWho();
+
+ if(sb&&user){
+  const {error}=await sb.from('profiles').upsert({id:user.id,nickname});
+  if(error)alert('닉네임 저장 오류: '+error.message);
+ }
+}
+
+$('#profileBtn').onclick=profile;
+
+$('#settingsBtn').onclick=()=>{
+ const u=prompt('Supabase Project URL',localStorage.getItem('mytier_url')||'');
+ if(u===null)return;
+ const k=prompt('Supabase anon/publishable key',localStorage.getItem('mytier_key')||'');
+ if(k===null)return;
+ localStorage.setItem('mytier_url',u.trim());
+ localStorage.setItem('mytier_key',k.trim());
+ location.reload();
+};
+
+$$('.nav button[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
+$$('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
+
+function fileData(file){
+ return new Promise((resolve,reject)=>{
+  const r=new FileReader();
+  r.onload=()=>resolve(r.result);
+  r.onerror=reject;
+  r.readAsDataURL(file);
+ });
+}
+
+async function createList(){
+ try{
+  if(!nickname){await profile();if(!nickname)return;}
+
+  const title=$('#newTitle').value.trim();
+  if(!title){alert('제목을 입력해 줘.');return;}
+
+  const mode=$('#newMode').value;
+  const isPublic=$('#newPublic').value==='true';
+  const files=[...$('#newFiles').files];
+
+  const prepared=await Promise.all(files.map(async f=>({
+   name:f.name.replace(/\.[^.]+$/,''),
+   file:f,
+   preview:await fileData(f)
+  })));
+
+  if(sb&&user){
+   const {data:list,error}=await sb.from('tier_lists').insert({
+    title,
+    description:$('#newDesc').value,
+    mode,
+    is_public:isPublic,
+    owner_id:user.id,
+    owner_nickname:nickname
+   }).select().single();
+
+   if(error)throw error;
+
+   for(let i=0;i<prepared.length;i++){
+    const f=prepared[i];
+    const ext=f.file.name.split('.').pop();
+    const path=`${list.id}/${crypto.randomUUID()}.${ext}`;
+    const up=await sb.storage.from('tier-images').upload(path,f.file,{upsert:false});
+    if(up.error){alert('이미지 업로드 오류: '+up.error.message);continue;}
+
+    const pub=sb.storage.from('tier-images').getPublicUrl(path).data.publicUrl;
+    const {error:itemError}=await sb.from('tier_items').insert({
+     list_id:list.id,
+     name:f.name,
+     image_url:pub,
+     sort_order:i
+    });
+    if(itemError)alert('항목 저장 오류: '+itemError.message);
+   }
+
+   await openList(list.id);
+  }else{
+   const id='demo-'+Math.random().toString(36).slice(2,9);
+   const list={
+    id,title,
+    description:$('#newDesc').value,
+    mode,
+    is_public:isPublic,
+    owner_nickname:nickname,
+    items:prepared.map((x,i)=>({
+     id:'it'+i,
+     name:x.name,
+     image_url:x.preview,
+     sort_order:i
+    })),
+    submissions:[]
+   };
+   localLists.unshift(list);
+   saveDemo();
+   await openList(id);
+  }
+ }catch(e){
+  console.error('티어리스트 생성 오류:',e);
+  alert('티어리스트 생성에 실패했어: '+(e.message||e));
+ }
+}
+
+function saveDemo(){
+ localStorage.setItem('mytier_demo',JSON.stringify(localLists));
+}
+
+$('#createBtn').onclick=createList;
+
+async function fetchList(id){
+ if(sb){
+  const {data:list,error}=await sb.from('tier_lists').select('*').eq('id',id).single();
+  if(error)throw error;
+  const {data:its}=await sb.from('tier_items').select('*').eq('list_id',id).order('sort_order');
+  const {data:sub}=await sb.from('tier_submissions').select('id,participant_nickname,created_at').eq('list_id',id);
+  return {...list,items:its||[],submissions:sub||[]};
+ }
+ const l=localLists.find(x=>x.id===id);
+ if(!l)throw Error('티어리스트를 찾을 수 없어.');
+ return l;
+}
+
+async function openList(id){
+ try{
+  current=await fetchList(id);
+  items=(current.items||[]).map(x=>({...x,tier:'pool'}));
+  selected=null;
+  $('#detailTitle').textContent=current.title;
+  $('#detailDesc').textContent=current.description||'';
+  $('#detailMode').textContent=current.mode==='common'?'COMMON TIER LIST':'FREE TIER LIST';
+  $('#ownerTools').innerHTML=(current.owner_id===user?.id||current.owner_nickname===nickname)?'<span class="tiny muted">제작자</span>':'';
+  renderBoard();
+  show('detail');
+  history.replaceState({},'',location.pathname+'?tier='+encodeURIComponent(id));
+  msg('사진을 선택한 다음 원하는 티어 영역을 눌러줘.');
+ }catch(e){alert(e.message);}
+}
+
+/* 모바일 터치 배치 수정 */
+function renderBoard(){
+ const board=$('#tierBoard');
+ board.innerHTML='';
+
+ tiers.forEach(([label,color])=>{
+  const row=document.createElement('div');
+  row.className='tier';
+  row.innerHTML=`
+   <div class="tier-label" style="background:${color}">${label}</div>
+   <div class="tiles" data-tier="${label}"></div>
+  `;
+
+  row.addEventListener('dragover',e=>e.preventDefault());
+  row.addEventListener('drop',e=>{
+   e.preventDefault();
+   const id=e.dataTransfer.getData('text/plain');
+   if(id)place(id,label);
+  });
+
+  row.addEventListener('click',()=>{
+   if(selected)place(selected,label);
+  });
+
+  row.querySelector('.tiles').append(
+   ...items.filter(x=>x.tier===label).map(tile)
+  );
+
+  board.append(row);
+ });
+
+ const u=$('#unranked');
+ u.innerHTML='';
+ u.dataset.tier='pool';
+
+ u.addEventListener('dragover',e=>e.preventDefault());
+ u.addEventListener('drop',e=>{
+  e.preventDefault();
+  const id=e.dataTransfer.getData('text/plain');
+  if(id)place(id,'pool');
+ });
+
+ u.addEventListener('click',()=>{
+  if(selected)place(selected,'pool');
+ });
+
+ u.append(...items.filter(x=>x.tier==='pool').map(tile));
+
+ if(!u.children.length)u.textContent='미분류 항목 없음';
+}
+
+function tile(it){
+ const el=document.createElement('div');
+ el.className='tile'+(selected===it.id?' selected':'');
+ el.draggable=true;
+ el.innerHTML=`
+  <img src="${it.image_url||it.preview||''}" alt="">
+  <span>${escapeHtml(it.name)}</span>
+ `;
+
+ el.addEventListener('dragstart',e=>{
+  e.dataTransfer.setData('text/plain',it.id);
+ });
+
+ el.addEventListener('click',e=>{
+  e.stopPropagation();
+  selected=it.id;
+  renderBoard();
+  msg(it.name+' 선택됨. 이동할 티어를 눌러줘.');
+ });
+
+ return el;
+}
+
+function place(id,tier){
+ const it=items.find(x=>x.id===id);
+ if(!it)return;
+ it.tier=tier;
+ selected=null;
+ renderBoard();
+ msg(it.name+' 항목을 '+(tier==='pool'?'미분류':tier)+' 티어에 배치했어.');
+}
+
+async function addFiles(files){
+ if(!current)return;
+
+ if(current.mode==='common'&&current.owner_id!==user?.id&&current.owner_nickname!==nickname){
+  msg('공통 주제형은 제작자가 항목을 관리해.');
+  return;
+ }
+
+ for(const f of files){
+  const preview=await fileData(f);
+  let url=preview;
+
+  if(sb&&user){
+   const ext=f.name.split('.').pop();
+   const path=`${current.id}/${crypto.randomUUID()}.${ext}`;
+   const up=await sb.storage.from('tier-images').upload(path,f);
+   if(up.error){alert(up.error.message);continue;}
+   url=sb.storage.from('tier-images').getPublicUrl(path).data.publicUrl;
+  }
+
+  const it={
+   id:'new-'+Math.random().toString(36).slice(2),
+   name:f.name.replace(/\.[^.]+$/,''),
+   image_url:url,
+   tier:'pool'
+  };
+
+  if(sb&&user){
+   const {data,error}=await sb.from('tier_items').insert({
+    list_id:current.id,
+    name:it.name,
+    image_url:url
+   }).select().single();
+
+   if(error){alert(error.message);continue;}
+   it.id=data.id;
+  }
+
+  items.push(it);
+ }
+
+ renderBoard();
+ msg('사진을 추가했어. 사진을 누른 다음 원하는 티어를 눌러줘.');
+}
+
+$('#addImages').onchange=e=>{
+ addFiles([...e.target.files]);
+ e.target.value='';
+};
+
+async function submit(){
+ if(!current)return;
+ if(!nickname){await profile();if(!nickname)return;}
+ if(!items.length){alert('평가할 항목이 없어.');return;}
+
+ if(sb&&user){
+  const {data:sub,error}=await sb.from('tier_submissions').insert({
+   list_id:current.id,
+   user_id:user.id,
+   participant_nickname:nickname
+  }).select().single();
+
+  if(error){alert(error.message);return;}
+
+  const rows=items.map(x=>({
+   submission_id:sub.id,
+   item_id:x.id,
+   tier:x.tier
+  }));
+
+  const r=await sb.from('tier_placements').insert(rows);
+  if(r.error){alert(r.error.message);return;}
+ }else{
+  current.submissions=current.submissions||[];
+  current.submissions=current.submissions.filter(x=>x.nickname!==nickname);
+  current.submissions.push({
+   nickname,
+   placements:items.map(x=>({item_id:x.id,tier:x.tier}))
+  });
+  saveDemo();
+ }
+
+ msg('제출 완료! 전체 결과에서 다른 참여자들의 평가를 확인할 수 있어.');
+ await results();
+}
+
+$('#submitBtn').onclick=submit;
+$('#viewResults').onclick=results;
+$('#backDetail').onclick=()=>show('detail');
+
+async function results(){
+ if(!current)return;
+ let count=0,rows=[];
+
+ if(sb&&user){
+  const {data:subs}=await sb.from('tier_submissions').select('id').eq('list_id',current.id);
+  count=subs?.length||0;
+
+  const {data:places}=await sb.from('tier_placements')
+   .select('item_id,tier,tier_items(name,image_url)')
+   .in('submission_id',(subs||[]).map(x=>x.id));
+
+  const pts={S:6,A:5,B:4,C:3,D:2,F:1};
+  const map={};
+
+  (places||[]).forEach(p=>{
+   const k=p.item_id;
+   if(!map[k])map[k]={
+    name:p.tier_items?.name||'항목',
+    image:p.tier_items?.image_url,
+    n:0,sum:0,tiers:{}
+   };
+   map[k].n++;
+   map[k].sum+=pts[p.tier]||0;
+   map[k].tiers[p.tier]=(map[k].tiers[p.tier]||0)+1;
+  });
+
+  rows=Object.values(map).sort((a,b)=>b.sum/b.n-a.sum/a.n);
+ }else{
+  const subs=current.submissions||[];
+  count=subs.length;
+  const pts={S:6,A:5,B:4,C:3,D:2,F:1};
+  const map={};
+
+  subs.forEach(s=>(s.placements||[]).forEach(p=>{
+   const it=current.items.find(x=>x.id===p.item_id);
+   if(!it)return;
+   if(!map[p.item_id])map[p.item_id]={
+    name:it.name,image:it.image_url,n:0,sum:0,tiers:{}
+   };
+   map[p.item_id].n++;
+   map[p.item_id].sum+=pts[p.tier]||0;
+   map[p.item_id].tiers[p.tier]=(map[p.item_id].tiers[p.tier]||0)+1;
+  }));
+
+  rows=Object.values(map).sort((a,b)=>b.sum/b.n-a.sum/a.n);
+ }
+
+ $('#resultStats').innerHTML=`
+ <div class="stat"><b>${count}</b><span class="tiny muted">제출 수</span></div>
+ <div class="stat"><b>${rows.length}</b><span class="tiny muted">집계 항목</span></div>
+ <div class="stat"><b>${rows.length?escapeHtml(rows[0].name):'-'}</b><span class="tiny muted">평균 1위</span></div>`;
+
+ $('#resultList').innerHTML=rows.map((r,i)=>`
+ <div class="itemrow">
+ ${r.image?`<img src="${r.image}" alt="">`:''}
+ <div class="grow">
+ <b>${i+1}. ${escapeHtml(r.name)}</b>
+ <div class="tiny muted">평균 ${(r.sum/r.n).toFixed(2)}점 · ${r.n}표 · ${Object.entries(r.tiers).map(([t,n])=>t+': '+n).join(' / ')}</div>
+ </div>
+ <b>${tierOf(r)}</b>
+ </div>`).join('')||'<p class="muted tiny">아직 제출된 결과가 없어.</p>';
+
+ show('results');
+}
+
+function tierOf(r){
+ const avg=r.sum/r.n;
+ return avg>=5.5?'S':avg>=4.5?'A':avg>=3.5?'B':avg>=2.5?'C':avg>=1.5?'D':'F';
+}
+
+async function copyLink(){
+ const u=location.origin+location.pathname+'?tier='+encodeURIComponent(current.id);
+ try{
+  await navigator.clipboard.writeText(u);
+  msg('공유 링크를 복사했어.');
+ }catch(e){prompt('이 링크를 복사해 줘.',u);}
+}
+$('#copyLink').onclick=copyLink;
+
+function parseCode(s){
+ s=(s||'').trim();
+ try{if(s.includes('?'))return new URL(s).searchParams.get('tier')||s;}
+ catch(e){}
+ return s;
+}
+
+function join(){
+ const id=parseCode($('#joinCode').value||$('#joinCode2').value);
+ if(id)openList(id);
+ else alert('공유 코드나 링크를 입력해 줘.');
+}
+$('#joinBtn').onclick=join;
+$('#joinBtn2').onclick=join;
+
+async function loadHome(){
+ let list=[];
+
+ if(sb&&user){
+  const {data,error}=await sb.from('tier_lists')
+   .select('id,title,description,mode,owner_nickname')
+   .eq('is_public',true)
+   .order('created_at',{ascending:false})
+   .limit(12);
+
+  if(error)console.error('공개 목록 불러오기 오류:',error);
+  list=data||[];
+ }else{
+  list=localLists.filter(x=>x.is_public);
+ }
+
+ $('#recent').innerHTML=list.map(x=>`
+ <div class="card">
+ <small class="muted">${x.mode==='common'?'COMMON':'FREE'} · ${escapeHtml(x.owner_nickname||'익명')}</small>
+ <h3>${escapeHtml(x.title)}</h3>
+ <p class="tiny muted">${escapeHtml(x.description||'')}</p>
+ <button data-open="${x.id}">열기</button>
+ </div>`).join('')||'<p class="muted tiny">공개 티어리스트가 없어. 첫 티어리스트를 만들어 봐!</p>';
+
+ $$('[data-open]').forEach(b=>b.onclick=()=>openList(b.dataset.open));
+ show('home');
+}
+
+async function loadMine(){
+ let list=[];
+
+ if(sb&&user){
+  const {data,error}=await sb.from('tier_lists')
+   .select('id,title,mode,owner_nickname')
+   .eq('owner_id',user.id)
+   .order('created_at',{ascending:false});
+
+  if(error){alert(error.message);return;}
+  list=data||[];
+ }else{
+  list=localLists;
+ }
+
+ $('#mineList').innerHTML=list.map(x=>`
+ <div class="itemrow">
+ <div class="grow">
+ <b>${escapeHtml(x.title)}</b>
+ <div class="tiny muted">${x.mode==='common'?'공통 주제형':'자유 제작형'}</div>
+ </div>
+ <button data-open="${x.id}">열기</button>
+ </div>`).join('')||'<p class="muted tiny">아직 만든 티어리스트가 없어.</p>';
+
+ $$('#mineList [data-open]').forEach(b=>b.onclick=()=>openList(b.dataset.open));
+ show('mine');
+}
+
+async function loadRankings(){
+ let list=[];
+
+ if(sb&&user){
+  const {data,error}=await sb.from('tier_lists')
+   .select('id,title,mode,owner_nickname')
+   .eq('is_public',true)
+   .order('created_at',{ascending:false})
+   .limit(30);
+
+  if(error)console.error(error);
+  list=data||[];
+ }else{
+  list=localLists.filter(x=>x.is_public);
+ }
+
+ $('#rankingList').innerHTML=list.map(x=>`
+ <div class="itemrow">
+ <div class="grow">
+ <b>${escapeHtml(x.title)}</b>
+ <div class="tiny muted">${escapeHtml(x.owner_nickname||'')} · ${x.mode==='common'?'공통':'자유'}</div>
+ </div>
+ <button data-open="${x.id}">결과 보기</button>
+ </div>`).join('')||'<p class="muted tiny">공개된 목록이 없어.</p>';
+
+ $$('#rankingList [data-open]').forEach(b=>b.onclick=async()=>{
+  await openList(b.dataset.open);
+  await results();
+ });
+}
+
+$$('[data-view="rankings"]').forEach(b=>b.onclick=loadRankings);
+$$('[data-view="mine"]').forEach(b=>b.onclick=loadMine);
+
+setup();
+</script>
+</body>
+</html>
