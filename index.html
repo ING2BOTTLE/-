@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#10131c">
 <title>MY TIER · Community</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 :root{color-scheme:dark;--bg:#10131c;--panel:#191f2d;--panel2:#242d40;--line:#35415a;--txt:#f4f6fc;--muted:#9ca9c1}
 *{box-sizing:border-box}
@@ -65,6 +66,7 @@ main{padding:5px 9px 40px}
 }
 </style>
 </head>
+
 <body>
 <header>
 <div><small>COMMUNITY RANKING SYSTEM</small><h1>MY TIER.</h1></div>
@@ -83,9 +85,7 @@ main{padding:5px 9px 40px}
 <button id="settingsBtn">연결 설정</button>
 </nav>
 
-<div id="setupNotice" class="notice">
-데모 모드로 실행 중이야. 여러 사람의 실시간 공유와 집계를 사용하려면 Supabase 프로젝트를 연결해 줘.
-</div>
+<div id="setupNotice" class="notice hidden"></div>
 
 <div class="notice warning">
 <b>⚠️ 계정 데이터 보관 안내</b><br>
@@ -102,6 +102,7 @@ main{padding:5px 9px 40px}
 <button data-go="join">초대 코드로 참여</button>
 </div>
 </div>
+
 <div class="panel">
 <h3>링크로 참여하기</h3>
 <div class="row">
@@ -109,6 +110,7 @@ main{padding:5px 9px 40px}
 <button id="joinBtn" class="primary">참여</button>
 </div>
 </div>
+
 <div class="panel">
 <h3>최근 공개 티어리스트</h3>
 <div id="recent" class="grid"></div>
@@ -206,6 +208,10 @@ main{padding:5px 9px 40px}
 <footer>MY TIER · Community tier ranking · 개인 정보 대신 닉네임을 사용해.</footer>
 
 <script>
+/* Supabase 기본 연결 정보 */
+const SUPABASE_URL='https://gyzvmzkizjugnwbgzqxu.supabase.co';
+const SUPABASE_KEY='sb_publishable_6AVrBI6GJSukLDkcoKDv8w_vNVLYWc4';
+
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 
@@ -218,56 +224,80 @@ let tiers=[['S','#ef777d'],['A','#efa85d'],['B','#e8d36b'],['C','#83bd91'],['D',
 let selected=null;
 let localLists=JSON.parse(localStorage.getItem('mytier_demo')||'[]');
 
-function msg(s){$('#detailStatus').textContent=s}
-function escapeHtml(s){
- return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function msg(s){
+ $('#detailStatus').textContent=s;
 }
+
+function escapeHtml(s){
+ return String(s||'').replace(/[&<>"']/g,c=>({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+ }[c]));
+}
+
 function show(v){
  $$('.view').forEach(x=>x.classList.add('hidden'));
  $('#'+v).classList.remove('hidden');
- $$('.nav button[data-view]').forEach(b=>b.classList.toggle('primary',b.dataset.view===v));
+ $$('.nav button[data-view]').forEach(b=>{
+  b.classList.toggle('primary',b.dataset.view===v);
+ });
 }
-function updateWho(){ $('#who').textContent=nickname||'닉네임 미설정'; }
-function getCode(){return new URL(location.href).searchParams.get('tier')}
 
+function updateWho(){
+ $('#who').textContent=nickname||'닉네임 미설정';
+}
+
+function getCode(){
+ return new URL(location.href).searchParams.get('tier');
+}
+
+/* Supabase 자동 연결 및 익명 로그인 */
 async function setup(){
- const url=localStorage.getItem('mytier_url');
- const key=localStorage.getItem('mytier_key');
-
- if(url&&key){
-  try{
-   if(!window.supabase) throw new Error('Supabase 라이브러리를 불러오지 못했어.');
-
-   const client=window.supabase.createClient(url,key);
-   const {data:sessionData,error:sessionError}=await client.auth.getSession();
-   if(sessionError) throw sessionError;
-
-   user=sessionData.session?.user||null;
-
-   if(!user){
-    const {data,error}=await client.auth.signInAnonymously();
-    if(error) throw error;
-    user=data.user||data.session?.user||null;
-   }
-
-   if(!user) throw new Error('로그인 사용자 정보를 가져오지 못했어.');
-
-   sb=client;
-   $('#setupNotice').classList.add('hidden');
-
-  }catch(e){
-   console.error('Supabase 로그인 오류:',e);
-   sb=null;
-   user=null;
-   $('#setupNotice').classList.remove('hidden');
-   $('#setupNotice').textContent='Supabase 로그인 실패. 데모 모드로 실행 중이야. 오류: '+e.message;
+ try{
+  if(!window.supabase){
+   throw new Error('Supabase 라이브러리를 불러오지 못했어.');
   }
+
+  const url=localStorage.getItem('mytier_url')||SUPABASE_URL;
+  const key=localStorage.getItem('mytier_key')||SUPABASE_KEY;
+
+  const client=window.supabase.createClient(url,key);
+
+  const {data:sessionData,error:sessionError}=await client.auth.getSession();
+  if(sessionError)throw sessionError;
+
+  user=sessionData.session?.user||null;
+
+  if(!user){
+   const {data,error}=await client.auth.signInAnonymously();
+   if(error)throw error;
+   user=data.user||data.session?.user||null;
+  }
+
+  if(!user){
+   throw new Error('로그인 사용자 정보를 가져오지 못했어.');
+  }
+
+  sb=client;
+  $('#setupNotice').classList.add('hidden');
+
+ }catch(e){
+  console.error('Supabase 연결 오류:',e);
+  sb=null;
+  user=null;
+
+  $('#setupNotice').classList.remove('hidden');
+  $('#setupNotice').textContent='Supabase 연결 실패: '+e.message;
  }
 
  updateWho();
 
  if(sb&&user){
-  const {data,error}=await sb.from('profiles').select('nickname').eq('id',user.id).maybeSingle();
+  const {data,error}=await sb
+   .from('profiles')
+   .select('nickname')
+   .eq('id',user.id)
+   .maybeSingle();
+
   if(!error&&data?.nickname){
    nickname=data.nickname;
    localStorage.setItem('mytier_nick',nickname);
@@ -275,39 +305,61 @@ async function setup(){
   }
  }
 
- if(getCode()) await openList(getCode());
- else await loadHome();
+ if(getCode()){
+  await openList(getCode());
+ }else{
+  await loadHome();
+ }
 }
 
 async function profile(){
  const n=prompt('사용할 닉네임을 입력해 줘.',nickname);
  if(n===null)return;
- if(!n.trim()){alert('닉네임을 입력해 줘.');return;}
+ if(!n.trim()){
+  alert('닉네임을 입력해 줘.');
+  return;
+ }
 
  nickname=n.trim().slice(0,24);
  localStorage.setItem('mytier_nick',nickname);
  updateWho();
 
  if(sb&&user){
-  const {error}=await sb.from('profiles').upsert({id:user.id,nickname});
-  if(error)alert('닉네임 저장 오류: '+error.message);
- }
+  const {error}=await sb.from('profiles').upsert({
+   id:user.id,
+   nickname
+  });
+
+  if(error){
+   alert('닉네임 저장 오류: '+error.message);
+  }
 }
 
 $('#profileBtn').onclick=profile;
 
 $('#settingsBtn').onclick=()=>{
- const u=prompt('Supabase Project URL',localStorage.getItem('mytier_url')||'');
+ const u=prompt('Supabase Project URL',localStorage.getItem('mytier_url')||SUPABASE_URL);
  if(u===null)return;
- const k=prompt('Supabase anon/publishable key',localStorage.getItem('mytier_key')||'');
+
+ const k=prompt('Supabase publishable key',localStorage.getItem('mytier_key')||SUPABASE_KEY);
  if(k===null)return;
+
  localStorage.setItem('mytier_url',u.trim());
  localStorage.setItem('mytier_key',k.trim());
  location.reload();
 };
 
-$$('.nav button[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
-$$('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
+$$('.nav button[data-view]').forEach(b=>{
+ b.onclick=()=>{
+  if(b.dataset.view==='rankings')loadRankings();
+  else if(b.dataset.view==='mine')loadMine();
+  else show(b.dataset.view);
+ };
+});
+
+$$('[data-go]').forEach(b=>{
+ b.onclick=()=>show(b.dataset.go);
+});
 
 function fileData(file){
  return new Promise((resolve,reject)=>{
@@ -318,115 +370,199 @@ function fileData(file){
  });
 }
 
+function safeExtension(filename){
+ const ext=(filename.split('.').pop()||'jpg').toLowerCase();
+ return /^[a-z0-9]{1,8}$/.test(ext)?ext:'jpg';
+}
+
+async function uploadImage(file,listId){
+ if(!sb||!user){
+  throw new Error('Supabase에 연결되어 있지 않아.');
+ }
+
+ const ext=safeExtension(file.name);
+ const path=`${listId}/${crypto.randomUUID()}.${ext}`;
+
+ const {error}=await sb.storage
+  .from('tier-images')
+  .upload(path,file,{upsert:false});
+
+ if(error)throw error;
+
+ const {data}=sb.storage
+  .from('tier-images')
+  .getPublicUrl(path);
+
+ return data.publicUrl;
+}
+
 async function createList(){
+ const btn=$('#createBtn');
+ if(btn.disabled)return;
+
+ btn.disabled=true;
+ btn.textContent='생성 중...';
+
  try{
-  if(!nickname){await profile();if(!nickname)return;}
+  if(!sb||!user){
+   throw new Error('Supabase 연결에 실패했어. 연결 상태를 확인해 줘.');
+  }
+
+  if(!nickname){
+   await profile();
+   if(!nickname)return;
+  }
 
   const title=$('#newTitle').value.trim();
-  if(!title){alert('제목을 입력해 줘.');return;}
+  if(!title){
+   alert('제목을 입력해 줘.');
+   return;
+  }
 
   const mode=$('#newMode').value;
   const isPublic=$('#newPublic').value==='true';
   const files=[...$('#newFiles').files];
 
-  const prepared=await Promise.all(files.map(async f=>({
-   name:f.name.replace(/\.[^.]+$/,''),
-   file:f,
-   preview:await fileData(f)
-  })));
-
-  if(sb&&user){
-   const {data:list,error}=await sb.from('tier_lists').insert({
+  const {data:list,error}=await sb
+   .from('tier_lists')
+   .insert({
     title,
     description:$('#newDesc').value,
     mode,
     is_public:isPublic,
     owner_id:user.id,
     owner_nickname:nickname
-   }).select().single();
+   })
+   .select()
+   .single();
 
-   if(error)throw error;
+  if(error)throw error;
 
-   for(let i=0;i<prepared.length;i++){
-    const f=prepared[i];
-    const ext=f.file.name.split('.').pop();
-    const path=`${list.id}/${crypto.randomUUID()}.${ext}`;
-    const up=await sb.storage.from('tier-images').upload(path,f.file,{upsert:false});
-    if(up.error){alert('이미지 업로드 오류: '+up.error.message);continue;}
+  let imageErrors=[];
 
-    const pub=sb.storage.from('tier-images').getPublicUrl(path).data.publicUrl;
-    const {error:itemError}=await sb.from('tier_items').insert({
-     list_id:list.id,
-     name:f.name,
-     image_url:pub,
-     sort_order:i
-    });
-    if(itemError)alert('항목 저장 오류: '+itemError.message);
+  for(let i=0;i<files.length;i++){
+   const file=files[i];
+
+   try{
+    const imageUrl=await uploadImage(file,list.id);
+
+    const {error:itemError}=await sb
+     .from('tier_items')
+     .insert({
+      list_id:list.id,
+      name:file.name.replace(/\.[^.]+$/,''),
+      image_url:imageUrl,
+      sort_order:i
+     });
+
+    if(itemError)throw itemError;
+
+   }catch(e){
+    console.error('이미지 저장 오류:',e);
+    imageErrors.push(file.name+': '+e.message);
    }
-
-   await openList(list.id);
-  }else{
-   const id='demo-'+Math.random().toString(36).slice(2,9);
-   const list={
-    id,title,
-    description:$('#newDesc').value,
-    mode,
-    is_public:isPublic,
-    owner_nickname:nickname,
-    items:prepared.map((x,i)=>({
-     id:'it'+i,
-     name:x.name,
-     image_url:x.preview,
-     sort_order:i
-    })),
-    submissions:[]
-   };
-   localLists.unshift(list);
-   saveDemo();
-   await openList(id);
   }
+
+  $('#newTitle').value='';
+  $('#newDesc').value='';
+  $('#newFiles').value='';
+
+  if(imageErrors.length){
+   alert('티어리스트는 생성됐지만 일부 이미지 저장에 실패했어.\n'+imageErrors.join('\n'));
+  }
+
+  await openList(list.id);
+
  }catch(e){
   console.error('티어리스트 생성 오류:',e);
-  alert('티어리스트 생성에 실패했어: '+(e.message||e));
+  alert('티어리스트 생성에 실패했어.\n'+(e.message||e));
+ }finally{
+  btn.disabled=false;
+  btn.textContent='티어리스트 생성';
  }
-}
-
-function saveDemo(){
- localStorage.setItem('mytier_demo',JSON.stringify(localLists));
 }
 
 $('#createBtn').onclick=createList;
 
 async function fetchList(id){
- if(sb){
-  const {data:list,error}=await sb.from('tier_lists').select('*').eq('id',id).single();
-  if(error)throw error;
-  const {data:its}=await sb.from('tier_items').select('*').eq('list_id',id).order('sort_order');
-  const {data:sub}=await sb.from('tier_submissions').select('id,participant_nickname,created_at').eq('list_id',id);
-  return {...list,items:its||[],submissions:sub||[]};
+ if(!sb){
+  throw new Error('Supabase 연결이 되어 있지 않아.');
  }
- const l=localLists.find(x=>x.id===id);
- if(!l)throw Error('티어리스트를 찾을 수 없어.');
- return l;
+
+ const {data:list,error}=await sb
+  .from('tier_lists')
+  .select('*')
+  .eq('id',id)
+  .single();
+
+ if(error){
+  if(error.code==='PGRST116'){
+   throw new Error('티어리스트를 찾을 수 없어. 링크가 올바른지 확인해 줘.');
+  }
+  throw error;
+ }
+
+ const {data:its,error:itemError}=await sb
+  .from('tier_items')
+  .select('*')
+  .eq('list_id',id)
+  .order('sort_order',{ascending:true});
+
+ if(itemError)throw itemError;
+
+ const {data:sub,error:subError}=await sb
+  .from('tier_submissions')
+  .select('id,participant_nickname,created_at')
+  .eq('list_id',id);
+
+ if(subError)throw subError;
+
+ return {
+  ...list,
+  items:its||[],
+  submissions:sub||[]
+ };
 }
 
 async function openList(id){
  try{
   current=await fetchList(id);
-  items=(current.items||[]).map(x=>({...x,tier:'pool'}));
+
+  items=(current.items||[]).map(x=>({
+   ...x,
+   tier:'pool'
+  }));
+
   selected=null;
+
   $('#detailTitle').textContent=current.title;
   $('#detailDesc').textContent=current.description||'';
-  $('#detailMode').textContent=current.mode==='common'?'COMMON TIER LIST':'FREE TIER LIST';
-  $('#ownerTools').innerHTML=(current.owner_id===user?.id||current.owner_nickname===nickname)?'<span class="tiny muted">제작자</span>':'';
+  $('#detailMode').textContent=
+   current.mode==='common'?'COMMON TIER LIST':'FREE TIER LIST';
+
+  $('#ownerTools').innerHTML=
+   current.owner_id===user?.id
+   ?'<span class="tiny muted">제작자</span>'
+   :'';
+
   renderBoard();
   show('detail');
-  history.replaceState({},'',location.pathname+'?tier='+encodeURIComponent(id));
+
+  history.replaceState(
+   {},
+   '',
+   location.pathname+'?tier='+encodeURIComponent(id)
+  );
+
   msg('사진을 선택한 다음 원하는 티어 영역을 눌러줘.');
- }catch(e){alert(e.message);}
+
+ }catch(e){
+  console.error('티어리스트 열기 오류:',e);
+  alert('티어리스트를 열 수 없어.\n'+e.message);
+ }
 }
 
-/* 모바일 터치 배치 수정 */
+/* 모바일 터치 및 드래그 배치 */
 function renderBoard(){
  const board=$('#tierBoard');
  board.innerHTML='';
@@ -434,12 +570,14 @@ function renderBoard(){
  tiers.forEach(([label,color])=>{
   const row=document.createElement('div');
   row.className='tier';
+
   row.innerHTML=`
    <div class="tier-label" style="background:${color}">${label}</div>
    <div class="tiles" data-tier="${label}"></div>
   `;
 
   row.addEventListener('dragover',e=>e.preventDefault());
+
   row.addEventListener('drop',e=>{
    e.preventDefault();
    const id=e.dataTransfer.getData('text/plain');
@@ -462,6 +600,7 @@ function renderBoard(){
  u.dataset.tier='pool';
 
  u.addEventListener('dragover',e=>e.preventDefault());
+
  u.addEventListener('drop',e=>{
   e.preventDefault();
   const id=e.dataTransfer.getData('text/plain');
@@ -474,20 +613,27 @@ function renderBoard(){
 
  u.append(...items.filter(x=>x.tier==='pool').map(tile));
 
- if(!u.children.length)u.textContent='미분류 항목 없음';
+ if(!u.children.length){
+  u.textContent='미분류 항목 없음';
+ }
 }
 
 function tile(it){
  const el=document.createElement('div');
  el.className='tile'+(selected===it.id?' selected':'');
  el.draggable=true;
- el.innerHTML=`
-  <img src="${it.image_url||it.preview||''}" alt="">
-  <span>${escapeHtml(it.name)}</span>
- `;
+
+ const img=document.createElement('img');
+ img.src=it.image_url||it.preview||'';
+ img.alt='';
+
+ const span=document.createElement('span');
+ span.textContent=it.name||'이름 없음';
+
+ el.append(img,span);
 
  el.addEventListener('dragstart',e=>{
-  e.dataTransfer.setData('text/plain',it.id);
+  e.dataTransfer.setData('text/plain',String(it.id));
  });
 
  el.addEventListener('click',e=>{
@@ -501,53 +647,61 @@ function tile(it){
 }
 
 function place(id,tier){
- const it=items.find(x=>x.id===id);
+ const it=items.find(x=>String(x.id)===String(id));
  if(!it)return;
+
  it.tier=tier;
  selected=null;
  renderBoard();
+
  msg(it.name+' 항목을 '+(tier==='pool'?'미분류':tier)+' 티어에 배치했어.');
 }
 
 async function addFiles(files){
- if(!current)return;
+ if(!current||!files.length)return;
 
- if(current.mode==='common'&&current.owner_id!==user?.id&&current.owner_nickname!==nickname){
+ if(!sb||!user){
+  alert('Supabase 연결이 되어 있지 않아.');
+  return;
+ }
+
+ if(current.mode==='common'&&current.owner_id!==user.id){
   msg('공통 주제형은 제작자가 항목을 관리해.');
   return;
  }
 
  for(const f of files){
-  const preview=await fileData(f);
-  let url=preview;
+  try{
+   if(!f.type.startsWith('image/')){
+    alert(f.name+' 파일은 이미지가 아니야.');
+    continue;
+   }
 
-  if(sb&&user){
-   const ext=f.name.split('.').pop();
-   const path=`${current.id}/${crypto.randomUUID()}.${ext}`;
-   const up=await sb.storage.from('tier-images').upload(path,f);
-   if(up.error){alert(up.error.message);continue;}
-   url=sb.storage.from('tier-images').getPublicUrl(path).data.publicUrl;
+   const url=await uploadImage(f,current.id);
+   const name=f.name.replace(/\.[^.]+$/,'');
+
+   const {data,error}=await sb
+    .from('tier_items')
+    .insert({
+     list_id:current.id,
+     name,
+     image_url:url,
+     sort_order:items.length
+    })
+    .select()
+    .single();
+
+   if(error)throw error;
+
+   items.push({
+    ...data,
+    tier:'pool'
+   });
+
+  }catch(e){
+   console.error('이미지 추가 오류:',e);
+   alert(f.name+' 추가 실패: '+e.message);
   }
-
-  const it={
-   id:'new-'+Math.random().toString(36).slice(2),
-   name:f.name.replace(/\.[^.]+$/,''),
-   image_url:url,
-   tier:'pool'
-  };
-
-  if(sb&&user){
-   const {data,error}=await sb.from('tier_items').insert({
-    list_id:current.id,
-    name:it.name,
-    image_url:url
-   }).select().single();
-
-   if(error){alert(error.message);continue;}
-   it.id=data.id;
-  }
-
-  items.push(it);
  }
 
  renderBoard();
@@ -561,17 +715,38 @@ $('#addImages').onchange=e=>{
 
 async function submit(){
  if(!current)return;
- if(!nickname){await profile();if(!nickname)return;}
- if(!items.length){alert('평가할 항목이 없어.');return;}
 
- if(sb&&user){
-  const {data:sub,error}=await sb.from('tier_submissions').insert({
-   list_id:current.id,
-   user_id:user.id,
-   participant_nickname:nickname
-  }).select().single();
+ if(!sb||!user){
+  alert('Supabase 연결이 되어 있지 않아.');
+  return;
+ }
 
-  if(error){alert(error.message);return;}
+ if(!nickname){
+  await profile();
+  if(!nickname)return;
+ }
+
+ if(!items.length){
+  alert('평가할 항목이 없어.');
+  return;
+ }
+
+ const btn=$('#submitBtn');
+ btn.disabled=true;
+ btn.textContent='제출 중...';
+
+ try{
+  const {data:sub,error}=await sb
+   .from('tier_submissions')
+   .insert({
+    list_id:current.id,
+    user_id:user.id,
+    participant_nickname:nickname
+   })
+   .select()
+   .single();
+
+  if(error)throw error;
 
   const rows=items.map(x=>({
    submission_id:sub.id,
@@ -579,20 +754,22 @@ async function submit(){
    tier:x.tier
   }));
 
-  const r=await sb.from('tier_placements').insert(rows);
-  if(r.error){alert(r.error.message);return;}
- }else{
-  current.submissions=current.submissions||[];
-  current.submissions=current.submissions.filter(x=>x.nickname!==nickname);
-  current.submissions.push({
-   nickname,
-   placements:items.map(x=>({item_id:x.id,tier:x.tier}))
-  });
-  saveDemo();
- }
+  const {error:placementError}=await sb
+   .from('tier_placements')
+   .insert(rows);
 
- msg('제출 완료! 전체 결과에서 다른 참여자들의 평가를 확인할 수 있어.');
- await results();
+  if(placementError)throw placementError;
+
+  msg('제출 완료! 전체 결과에서 다른 참여자들의 평가를 확인할 수 있어.');
+  await results();
+
+ }catch(e){
+  console.error('결과 제출 오류:',e);
+  alert('결과 제출에 실패했어.\n'+e.message);
+ }finally{
+  btn.disabled=false;
+  btn.textContent='내 결과 제출';
+ }
 }
 
 $('#submitBtn').onclick=submit;
@@ -601,68 +778,85 @@ $('#backDetail').onclick=()=>show('detail');
 
 async function results(){
  if(!current)return;
- let count=0,rows=[];
 
- if(sb&&user){
-  const {data:subs}=await sb.from('tier_submissions').select('id').eq('list_id',current.id);
-  count=subs?.length||0;
+ if(!sb){
+  alert('Supabase 연결이 되어 있지 않아.');
+  return;
+ }
 
-  const {data:places}=await sb.from('tier_placements')
-   .select('item_id,tier,tier_items(name,image_url)')
-   .in('submission_id',(subs||[]).map(x=>x.id));
+ try{
+  const {data:subs,error:subError}=await sb
+   .from('tier_submissions')
+   .select('id')
+   .eq('list_id',current.id);
+
+  if(subError)throw subError;
+
+  const count=subs?.length||0;
+  const submissionIds=(subs||[]).map(x=>x.id);
+
+  let places=[];
+
+  if(submissionIds.length){
+   const {data,error}=await sb
+    .from('tier_placements')
+    .select('item_id,tier,tier_items(name,image_url)')
+    .in('submission_id',submissionIds);
+
+   if(error)throw error;
+   places=data||[];
+  }
 
   const pts={S:6,A:5,B:4,C:3,D:2,F:1};
   const map={};
 
-  (places||[]).forEach(p=>{
+  places.forEach(p=>{
    const k=p.item_id;
-   if(!map[k])map[k]={
-    name:p.tier_items?.name||'항목',
-    image:p.tier_items?.image_url,
-    n:0,sum:0,tiers:{}
-   };
+
+   if(!map[k]){
+    map[k]={
+     name:p.tier_items?.name||'항목',
+     image:p.tier_items?.image_url,
+     n:0,
+     sum:0,
+     tiers:{}
+    };
+   }
+
    map[k].n++;
    map[k].sum+=pts[p.tier]||0;
    map[k].tiers[p.tier]=(map[k].tiers[p.tier]||0)+1;
   });
 
-  rows=Object.values(map).sort((a,b)=>b.sum/b.n-a.sum/a.n);
- }else{
-  const subs=current.submissions||[];
-  count=subs.length;
-  const pts={S:6,A:5,B:4,C:3,D:2,F:1};
-  const map={};
+  const rows=Object.values(map)
+   .sort((a,b)=>b.sum/b.n-a.sum/a.n);
 
-  subs.forEach(s=>(s.placements||[]).forEach(p=>{
-   const it=current.items.find(x=>x.id===p.item_id);
-   if(!it)return;
-   if(!map[p.item_id])map[p.item_id]={
-    name:it.name,image:it.image_url,n:0,sum:0,tiers:{}
-   };
-   map[p.item_id].n++;
-   map[p.item_id].sum+=pts[p.tier]||0;
-   map[p.item_id].tiers[p.tier]=(map[p.item_id].tiers[p.tier]||0)+1;
-  }));
+  $('#resultStats').innerHTML=`
+   <div class="stat"><b>${count}</b><span class="tiny muted">제출 수</span></div>
+   <div class="stat"><b>${rows.length}</b><span class="tiny muted">집계 항목</span></div>
+   <div class="stat"><b>${rows.length?escapeHtml(rows[0].name):'-'}</b><span class="tiny muted">평균 1위</span></div>
+  `;
 
-  rows=Object.values(map).sort((a,b)=>b.sum/b.n-a.sum/a.n);
+  $('#resultList').innerHTML=rows.map((r,i)=>`
+   <div class="itemrow">
+    ${r.image?`<img src="${escapeHtml(r.image)}" alt="">`:''}
+    <div class="grow">
+     <b>${i+1}. ${escapeHtml(r.name)}</b>
+     <div class="tiny muted">
+      평균 ${(r.sum/r.n).toFixed(2)}점 · ${r.n}표 ·
+      ${Object.entries(r.tiers).map(([t,n])=>t+': '+n).join(' / ')}
+     </div>
+    </div>
+    <b>${tierOf(r)}</b>
+   </div>
+  `).join('')||'<p class="muted tiny">아직 제출된 결과가 없어.</p>';
+
+  show('results');
+
+ }catch(e){
+  console.error('결과 집계 오류:',e);
+  alert('결과를 불러오지 못했어.\n'+e.message);
  }
-
- $('#resultStats').innerHTML=`
- <div class="stat"><b>${count}</b><span class="tiny muted">제출 수</span></div>
- <div class="stat"><b>${rows.length}</b><span class="tiny muted">집계 항목</span></div>
- <div class="stat"><b>${rows.length?escapeHtml(rows[0].name):'-'}</b><span class="tiny muted">평균 1위</span></div>`;
-
- $('#resultList').innerHTML=rows.map((r,i)=>`
- <div class="itemrow">
- ${r.image?`<img src="${r.image}" alt="">`:''}
- <div class="grow">
- <b>${i+1}. ${escapeHtml(r.name)}</b>
- <div class="tiny muted">평균 ${(r.sum/r.n).toFixed(2)}점 · ${r.n}표 · ${Object.entries(r.tiers).map(([t,n])=>t+': '+n).join(' / ')}</div>
- </div>
- <b>${tierOf(r)}</b>
- </div>`).join('')||'<p class="muted tiny">아직 제출된 결과가 없어.</p>';
-
- show('results');
 }
 
 function tierOf(r){
@@ -671,118 +865,167 @@ function tierOf(r){
 }
 
 async function copyLink(){
- const u=location.origin+location.pathname+'?tier='+encodeURIComponent(current.id);
+ if(!current)return;
+
+ const url=location.origin+location.pathname+'?tier='+encodeURIComponent(current.id);
+
  try{
-  await navigator.clipboard.writeText(u);
+  await navigator.clipboard.writeText(url);
   msg('공유 링크를 복사했어.');
- }catch(e){prompt('이 링크를 복사해 줘.',u);}
+ }catch(e){
+  prompt('이 링크를 복사해 줘.',url);
+ }
 }
+
 $('#copyLink').onclick=copyLink;
 
 function parseCode(s){
  s=(s||'').trim();
- try{if(s.includes('?'))return new URL(s).searchParams.get('tier')||s;}
- catch(e){}
+
+ try{
+  if(s.includes('?')){
+   return new URL(s).searchParams.get('tier')||s;
+  }
+ }catch(e){}
+
  return s;
 }
 
 function join(){
- const id=parseCode($('#joinCode').value||$('#joinCode2').value);
- if(id)openList(id);
- else alert('공유 코드나 링크를 입력해 줘.');
+ const input=$('#joinCode').value||$('#joinCode2').value;
+ const id=parseCode(input);
+
+ if(id){
+  openList(id);
+ }else{
+  alert('공유 코드나 링크를 입력해 줘.');
+ }
 }
+
 $('#joinBtn').onclick=join;
 $('#joinBtn2').onclick=join;
 
 async function loadHome(){
- let list=[];
+ if(!sb){
+  $('#recent').innerHTML='<p class="muted tiny">Supabase 연결을 확인해 줘.</p>';
+  show('home');
+  return;
+ }
 
- if(sb&&user){
-  const {data,error}=await sb.from('tier_lists')
+ try{
+  const {data,error}=await sb
+   .from('tier_lists')
    .select('id,title,description,mode,owner_nickname')
    .eq('is_public',true)
    .order('created_at',{ascending:false})
    .limit(12);
 
-  if(error)console.error('공개 목록 불러오기 오류:',error);
-  list=data||[];
- }else{
-  list=localLists.filter(x=>x.is_public);
+  if(error)throw error;
+
+  const list=data||[];
+
+  $('#recent').innerHTML=list.map(x=>`
+   <div class="card">
+    <small class="muted">${x.mode==='common'?'COMMON':'FREE'} · ${escapeHtml(x.owner_nickname||'익명')}</small>
+    <h3>${escapeHtml(x.title)}</h3>
+    <p class="tiny muted">${escapeHtml(x.description||'')}</p>
+    <button data-open="${escapeHtml(x.id)}">열기</button>
+   </div>
+  `).join('')||'<p class="muted tiny">공개 티어리스트가 없어. 첫 티어리스트를 만들어 봐!</p>';
+
+  $$('#recent [data-open]').forEach(b=>{
+   b.onclick=()=>openList(b.dataset.open);
+  });
+
+ }catch(e){
+  console.error('공개 목록 불러오기 오류:',e);
+  $('#recent').innerHTML='<p class="muted tiny">목록을 불러오지 못했어: '+escapeHtml(e.message)+'</p>';
  }
 
- $('#recent').innerHTML=list.map(x=>`
- <div class="card">
- <small class="muted">${x.mode==='common'?'COMMON':'FREE'} · ${escapeHtml(x.owner_nickname||'익명')}</small>
- <h3>${escapeHtml(x.title)}</h3>
- <p class="tiny muted">${escapeHtml(x.description||'')}</p>
- <button data-open="${x.id}">열기</button>
- </div>`).join('')||'<p class="muted tiny">공개 티어리스트가 없어. 첫 티어리스트를 만들어 봐!</p>';
-
- $$('[data-open]').forEach(b=>b.onclick=()=>openList(b.dataset.open));
  show('home');
 }
 
 async function loadMine(){
- let list=[];
+ if(!sb||!user){
+  alert('Supabase 연결이 필요해.');
+  return;
+ }
 
- if(sb&&user){
-  const {data,error}=await sb.from('tier_lists')
+ try{
+  const {data,error}=await sb
+   .from('tier_lists')
    .select('id,title,mode,owner_nickname')
    .eq('owner_id',user.id)
    .order('created_at',{ascending:false});
 
-  if(error){alert(error.message);return;}
-  list=data||[];
- }else{
-  list=localLists;
+  if(error)throw error;
+
+  const list=data||[];
+
+  $('#mineList').innerHTML=list.map(x=>`
+   <div class="itemrow">
+    <div class="grow">
+     <b>${escapeHtml(x.title)}</b>
+     <div class="tiny muted">${x.mode==='common'?'공통 주제형':'자유 제작형'}</div>
+    </div>
+    <button data-open="${escapeHtml(x.id)}">열기</button>
+   </div>
+  `).join('')||'<p class="muted tiny">아직 만든 티어리스트가 없어.</p>';
+
+  $$('#mineList [data-open]').forEach(b=>{
+   b.onclick=()=>openList(b.dataset.open);
+  });
+
+  show('mine');
+
+ }catch(e){
+  console.error('내 목록 오류:',e);
+  alert('내 목록을 불러오지 못했어.\n'+e.message);
  }
-
- $('#mineList').innerHTML=list.map(x=>`
- <div class="itemrow">
- <div class="grow">
- <b>${escapeHtml(x.title)}</b>
- <div class="tiny muted">${x.mode==='common'?'공통 주제형':'자유 제작형'}</div>
- </div>
- <button data-open="${x.id}">열기</button>
- </div>`).join('')||'<p class="muted tiny">아직 만든 티어리스트가 없어.</p>';
-
- $$('#mineList [data-open]').forEach(b=>b.onclick=()=>openList(b.dataset.open));
- show('mine');
 }
 
 async function loadRankings(){
- let list=[];
+ if(!sb){
+  alert('Supabase 연결이 필요해.');
+  return;
+ }
 
- if(sb&&user){
-  const {data,error}=await sb.from('tier_lists')
+ try{
+  const {data,error}=await sb
+   .from('tier_lists')
    .select('id,title,mode,owner_nickname')
    .eq('is_public',true)
    .order('created_at',{ascending:false})
    .limit(30);
 
-  if(error)console.error(error);
-  list=data||[];
- }else{
-  list=localLists.filter(x=>x.is_public);
+  if(error)throw error;
+
+  const list=data||[];
+
+  $('#rankingList').innerHTML=list.map(x=>`
+   <div class="itemrow">
+    <div class="grow">
+     <b>${escapeHtml(x.title)}</b>
+     <div class="tiny muted">${escapeHtml(x.owner_nickname||'')} · ${x.mode==='common'?'공통':'자유'}</div>
+    </div>
+    <button data-open="${escapeHtml(x.id)}">결과 보기</button>
+   </div>
+  `).join('')||'<p class="muted tiny">공개된 목록이 없어.</p>';
+
+  $$('#rankingList [data-open]').forEach(b=>{
+   b.onclick=async()=>{
+    await openList(b.dataset.open);
+    if(current?.id===b.dataset.open)await results();
+   };
+  });
+
+  show('rankings');
+
+ }catch(e){
+  console.error('랭킹 목록 오류:',e);
+  alert('랭킹을 불러오지 못했어.\n'+e.message);
  }
-
- $('#rankingList').innerHTML=list.map(x=>`
- <div class="itemrow">
- <div class="grow">
- <b>${escapeHtml(x.title)}</b>
- <div class="tiny muted">${escapeHtml(x.owner_nickname||'')} · ${x.mode==='common'?'공통':'자유'}</div>
- </div>
- <button data-open="${x.id}">결과 보기</button>
- </div>`).join('')||'<p class="muted tiny">공개된 목록이 없어.</p>';
-
- $$('#rankingList [data-open]').forEach(b=>b.onclick=async()=>{
-  await openList(b.dataset.open);
-  await results();
- });
 }
-
-$$('[data-view="rankings"]').forEach(b=>b.onclick=loadRankings);
-$$('[data-view="mine"]').forEach(b=>b.onclick=loadMine);
 
 setup();
 </script>
